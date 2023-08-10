@@ -1,11 +1,33 @@
-"""
-Based on the sample code Python implementation of Shamir's secret sharing
-released on https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing#Python_code
-under the CC0 and OWFa
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# ---------------------------------------------------------------------------
+# ------------------------- Shamir's Secret Sharing -------------------------
+# sss.py
+# Version: 0.1.0
+# 2023-08-10
+#
+# Authors:
+# Nils Höll
+#
+# ----------------------------------------------------------------------------
+# This tool is a wrapper around the sample code Python implementation of Shamir's secret sharing
+# released at https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing#Python_code
+# under the CC0 and OWFa
 
+import argparse
 import random
 import functools
+
+# ---------------------- CONFIG VARS ----------------------
+
+# Program info
+prog_version = "0.1.0"
+prog_date = "2023-08-10"
+prog_description = ""
+
+# Program defaults
+TOTAL_SHARDS = 5
+MIN_SHARDS = 3
 
 # 12th Mersenne Prime
 # (for this application we want a known prime number as close as
@@ -101,22 +123,52 @@ def recover_secret(shares, prime=_PRIME):
     x_s, y_s = zip(*shares)
     return _lagrange_interpolate(0, x_s, y_s, prime)
 
+def split_secret():
+    pass
+
+def join_secrets():
+    pass
+
 def main():
     """Main function"""
-    secret = 1234
-    shares = make_random_shares(secret, minimum=3, shares=6)
+    parser = argparse.ArgumentParser(description=prog_description)
+    parser.add_argument('-s', '--secret', help='TEXT')
+    parser.add_argument('-n', '--num-shards', help='TEXT', type=int, default=TOTAL_SHARDS)
+    parser.add_argument('-m', '--min-shards', help='TEXT', type=int, default=MIN_SHARDS)
+    parser.add_argument('-r', '--reconstruct', help="TEXT", nargs='+')
+    parser.add_argument('-c', '--shard-counter', help="TEXT", nargs='+')
+    parser.add_argument('-V', '--version', help='Print the version information', action='store_true')
+    
+    # Parse command line
+    args = parser.parse_args()
 
-    print('Secret:                                                     ',
-          secret)
-    print('Shares:')
-    if shares:
-        for share in shares:
-            print('  ', share)
+    if args.version:
+        print(prog_description)
+        print("Version: " + str(prog_version) + " (" + str(prog_date) + ")")
+        exit()
 
-    print('Secret recovered from minimum subset of shares:             ',
-          recover_secret(shares[:3]))
-    print('Secret recovered from a different minimum subset of shares: ',
-          recover_secret(shares[-3:]))
+    secret = args.secret
+    num_shards = args.num_shards
+    min_shards = args.min_shards
+    reconstruct = args.reconstruct
+    shard_counter = args.shard_counter
+
+    if args.reconstruct and len(reconstruct) > 0:
+        shards = []
+        i = 0
+        for shard in reconstruct:
+            shards.append((int(shard_counter[i]), int(shard)))
+            i += 1
+
+        recovered_secret = recover_secret(shards)
+        print(recovered_secret)
+        return
+
+    if args.secret and secret != "":
+        secret = int(args.secret)
+        shards = make_random_shares(secret, minimum=min_shards, shares=num_shards)
+        for shard in shards:
+            print(shard)
 
 if __name__ == '__main__':
     main()
