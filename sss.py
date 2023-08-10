@@ -15,6 +15,8 @@
 # under the CC0 and OWFa
 
 import argparse
+import base64
+import math
 import random
 import functools
 
@@ -123,20 +125,47 @@ def recover_secret(shares, prime=_PRIME):
     x_s, y_s = zip(*shares)
     return _lagrange_interpolate(0, x_s, y_s, prime)
 
-def split_secret():
-    pass
+# Converts a string into an integer represtation of its byte array
+def secret_to_int(secret:str):
+    secret_b64 = base64.b64encode(secret.encode('utf-8'))
+    secret_bin = ''.join(item[2:] for item in map(bin, secret_b64))
+    secret_int = int(secret_bin, 2)
+    return secret_int
 
-def join_secrets():
-    pass
+# Converts an integer back into a string
+def int_to_secret(secret_int:int):
+    secret_bin = bin(secret_int)[2:]
+    secret_b64 = ""
+    for x in range(math.ceil(len(secret_bin) / 7)):
+        char = int(secret_bin[x * 7:(x + 1) * 7], 2)
+        secret_b64 += chr(char)
+    secret = (base64.b64decode(secret_b64)).decode('utf-8')
+    return secret
+
+def split_secret(secret:str, min:int, max:int):
+    secret_int = secret_to_int(secret)
+    shards = make_random_shares(secret_int, minimum=min, shares=max)
+    return shards
+
+def join_secrets(shard_files:list):
+    shard_tuples = [(1, 43169837124188720964780342900310458552),
+                    (3, 160134327314659478454450597353340529382),
+                    (5, 91076994147313786513455993446030981984)]
+    secret_int = recover_secret(shard_tuples)
+    secret = int_to_secret(secret_int)
+    return secret
 
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description=prog_description)
+    parser.add_argument('--split', help='TEXT', action='store_true')
+    parser.add_argument('--join', help='TEXT', action='store_true')
     parser.add_argument('-s', '--secret', help='TEXT')
     parser.add_argument('-n', '--num-shards', help='TEXT', type=int, default=TOTAL_SHARDS)
     parser.add_argument('-m', '--min-shards', help='TEXT', type=int, default=MIN_SHARDS)
-    parser.add_argument('-r', '--reconstruct', help="TEXT", nargs='+')
-    parser.add_argument('-c', '--shard-counter', help="TEXT", nargs='+')
+    parser.add_argument('-S', '--shard-files', help="TEXT", nargs='+')
+    # parser.add_argument('-r', '--reconstruct', help="TEXT", nargs='+')
+    # parser.add_argument('-c', '--shard-counter', help="TEXT", nargs='+')
     parser.add_argument('-V', '--version', help='Print the version information', action='store_true')
     
     # Parse command line
@@ -147,28 +176,34 @@ def main():
         print("Version: " + str(prog_version) + " (" + str(prog_date) + ")")
         exit()
 
-    secret = args.secret
-    num_shards = args.num_shards
-    min_shards = args.min_shards
-    reconstruct = args.reconstruct
-    shard_counter = args.shard_counter
-
-    if args.reconstruct and len(reconstruct) > 0:
-        shards = []
-        i = 0
-        for shard in reconstruct:
-            shards.append((int(shard_counter[i]), int(shard)))
-            i += 1
-
-        recovered_secret = recover_secret(shards)
-        print(recovered_secret)
-        return
-
-    if args.secret and secret != "":
-        secret = int(args.secret)
-        shards = make_random_shares(secret, minimum=min_shards, shares=num_shards)
+    # Split the secret into shards
+    if args.split:
+        num_shards = args.num_shards
+        min_shards = args.min_shards
+        if not args.secret:
+            secret = input("Please provide the secret to split:\n")
+        else:
+            secret = args.secret
+        shards = split_secret(secret, min_shards, num_shards)
         for shard in shards:
             print(shard)
+        return
+
+    # Join the shards back into a secret
+    if args.join:
+        if type(args.shard_files) != list or len(args.shard_files) == 0:
+            pass
+
+        shard_files = args.shard_files
+
+        for file in shard_files:
+            # Check if it is a file
+            # Parse JSON
+            pass
+        
+        result = join_secrets(shard_files)
+        print(result)
+        return
 
 if __name__ == '__main__':
     main()
