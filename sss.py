@@ -136,23 +136,27 @@ def recover_secret(shares:list, min:int, prime=_PRIME):
 
 # Converts a string into an integer represtation of its byte array
 def secret_to_int(secret:str):
+    # print(f"[SPLIT]: Secret: {secret}")
     secret_b64 = base64.b64encode(secret.encode('utf-8'))
-    secret_bin = ''.join(item[2:] for item in map(bin, secret_b64))
+    # print(f"[SPLIT]: Secret b64: {secret_b64}")
+    secret_bin = ''.join(item[2:].zfill(7) for item in map(bin, secret_b64))
+    # print(f"[SPLIT]: Secret bin: {secret_bin}")
     secret_int = int(secret_bin, 2)
+    # print(f"[SPLIT]: Secret int: {secret_int}")
     return secret_int
 
 # Converts an integer back into a string
 def int_to_secret(secret_int:int):
+    # print(f"[JOIN]: Secret int: {secret_int}")
     secret_bin = bin(secret_int)[2:]
+    # print(f"[JOIN]: Secret bin: {secret_bin}")
     secret_b64 = ""
     for x in range(math.ceil(len(secret_bin) / 7)):
-        # Special case for b64 padding with '=' at the end
-        if len(secret_bin[x * 7:]) == 12 or len(secret_bin[x * 7:]) <= 6:
-            char = 61
-        else:
-            char = int(secret_bin[x * 7:(x + 1) * 7], 2)
+        char = int(secret_bin[x * 7:(x + 1) * 7], 2)
         secret_b64 += chr(char)
+    # print(f"[JOIN]: Secret b64: {secret_b64}")
     secret = (base64.b64decode(secret_b64)).decode('utf-8')
+    # print(f"[JOIN]: Secret: {secret}")
     return secret
 
 
@@ -226,7 +230,6 @@ def join_secrets(shard_files:list):
             shard_tuples.append((id, value))
 
     secret_int = recover_secret(shard_tuples, min_shards)
-    print(secret_int)
     secret = int_to_secret(secret_int)
     return secret
 
@@ -237,11 +240,10 @@ def main():
     """Main function"""
     parser = argparse.ArgumentParser(description=prog_description)
     parser.add_argument('--split', help='TEXT', action='store_true')
-    parser.add_argument('--join', help='TEXT', action='store_true')
+    parser.add_argument('--join', help='TEXT', nargs='+')
     parser.add_argument('-s', '--secret', help='TEXT')
     parser.add_argument('-n', '--num-shards', help='TEXT', type=int, default=TOTAL_SHARDS)
     parser.add_argument('-m', '--min-shards', help='TEXT', type=int, default=MIN_SHARDS)
-    parser.add_argument('-S', '--shard-files', help="TEXT", nargs='+')
     parser.add_argument('-V', '--version', help='Print the version information', action='store_true')
     
     # Parse command line
@@ -274,11 +276,11 @@ def main():
 
     # Join the shards back into a secret
     if args.join:
-        if type(args.shard_files) != list or len(args.shard_files) <= 1:
+        if type(args.join) != list or len(args.join) <= 1:
             print("ERROR: Please provide the path to at least two shard files")
             exit(1)
 
-        shard_files = args.shard_files
+        shard_files = args.join
         
         result = join_secrets(shard_files)
         if result:
