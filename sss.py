@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # ------------------------- Shamir's Secret Sharing -------------------------
 # sss.py
-# Version: 0.2.0
+# Version: 0.2.1
 # 2023-08-11
 #
 # Authors:
@@ -26,14 +26,16 @@ from hashlib import sha256
 # ---------------------- CONFIG VARS ----------------------
 
 # Program info
-prog_version = "0.2.0"
-prog_date = "2023-08-11"
-prog_description = ""
+PROG_VERSION = "0.2.1"
+PROG_DATE = "2023-08-11"
+PROG_DESCRIPTION = """This tool is able to split a secret (e.g., a passphrase or key) into a user-defined number of shards based on Shamir's Secret Sharing algorithm.
+To reconstruct the initial secret, only a subset of these shards is required (can also be specified)."""
 
 # Program defaults
 TOTAL_SHARDS = 5
 MIN_SHARDS = 3
 SHARD_PATH = './shards'
+DEBUG = False
 
 # 12th Mersenne Prime
 # (for this application we want a known prime number as close as
@@ -136,32 +138,52 @@ def recover_secret(shares:list, min:int, prime=_PRIME):
 
 # Converts a string into an integer represtation of its byte array
 def secret_to_int(secret:str):
-    # print(f"[SPLIT]: Secret: {secret}")
+
+    # Convert to Base64 for predictable characters
     secret_b64 = base64.b64encode(secret.encode('utf-8'))
-    # print(f"[SPLIT]: Secret b64: {secret_b64}")
+
+    # Convert into bitstring, with each character taking 7 bits
     secret_bin = ''.join(item[2:].zfill(7) for item in map(bin, secret_b64))
-    # print(f"[SPLIT]: Secret bin: {secret_bin}")
+
+    # Convert to integer for SSS processing
     secret_int = int(secret_bin, 2)
-    # print(f"[SPLIT]: Secret int: {secret_int}")
+
+    if DEBUG:
+        print(f"[SPLIT]: Secret: {secret}")
+        print(f"[SPLIT]: Secret b64: {secret_b64}")
+        print(f"[SPLIT]: Secret bin: {secret_bin}")
+        print(f"[SPLIT]: Secret int: {secret_int}")
+
     return secret_int
+
 
 # Converts an integer back into a string
 def int_to_secret(secret_int:int):
-    # print(f"[JOIN]: Secret int: {secret_int}")
     secret_bin = bin(secret_int)[2:]
-    # print(f"[JOIN]: Secret bin: {secret_bin}")
     secret_b64 = ""
+
+    # Convert the bitstring back to Base 64
     for x in range(math.ceil(len(secret_bin) / 7)):
         char = int(secret_bin[x * 7:(x + 1) * 7], 2)
         secret_b64 += chr(char)
-    # print(f"[JOIN]: Secret b64: {secret_b64}")
+    
+    if DEBUG:
+        print(f"[JOIN]: Secret int: {secret_int}")
+        print(f"[JOIN]: Secret bin: {secret_bin}")
+        print(f"[JOIN]: Secret b64: {secret_b64}")
+    
+    # Decode the Base64 to the original secret
     secret = (base64.b64decode(secret_b64)).decode('utf-8')
-    # print(f"[JOIN]: Secret: {secret}")
+
+    if DEBUG:
+        print(f"[JOIN]: Secret: {secret}")
+    
     return secret
 
 
 # ------- Wrapper Functions -------
 
+# Splits a secret into shards and saves those to files as JSON
 def split_secret(secret:str, min:int, max:int):
     print(f"Splitting secret {secret}")
     secret_int = secret_to_int(secret)
@@ -175,11 +197,14 @@ def split_secret(secret:str, min:int, max:int):
         fingerprints.append(fingerprint)
 
     outfiles = []
+
     # Generate full objects and write them to files
     for shard in shards:
         id, value = shard
         fingerprint = sha256(f"{id}_{value}".encode()).hexdigest()[1:17]
         outfiles.append(f"{id}_{fingerprint}.json")
+
+        # Dictionary that holds all relevant information for reconstruction & verification
         shard_obj = {
             'id': id,
             'shard': value,
@@ -198,6 +223,7 @@ def split_secret(secret:str, min:int, max:int):
 
     return outfiles
 
+# Takes a list of JSON files, parses them, and reconstructs the secret
 def join_secrets(shard_files:list):
 
     shard_tuples = []
@@ -227,8 +253,10 @@ def join_secrets(shard_files:list):
                 print(f"ERROR: Fingerprint for shard #{id} not matching")
                 return False
             
+            # Build the tuple for further processing
             shard_tuples.append((id, value))
 
+    # Reconstruct the original secret in its int represenation
     secret_int = recover_secret(shard_tuples, min_shards)
     secret = int_to_secret(secret_int)
     return secret
@@ -238,20 +266,20 @@ def join_secrets(shard_files:list):
 
 def main():
     """Main function"""
-    parser = argparse.ArgumentParser(description=prog_description)
-    parser.add_argument('--split', help='TEXT', action='store_true')
-    parser.add_argument('--join', help='TEXT', nargs='+')
-    parser.add_argument('-s', '--secret', help='TEXT')
-    parser.add_argument('-n', '--num-shards', help='TEXT', type=int, default=TOTAL_SHARDS)
-    parser.add_argument('-m', '--min-shards', help='TEXT', type=int, default=MIN_SHARDS)
+    parser = argparse.ArgumentParser(description=PROG_DESCRIPTION)
+    parser.add_argument('--split', help='Split a secret (either given via -s or prompted on the cli) into shards. Takes -s, -n, and -m as arguments', action='store_true')
+    parser.add_argument('--join', help='Join the given shard files back into the original secret. Takes multiple file paths.', nargs='+')
+    parser.add_argument('-s', '--secret', help='The secret to split up')
+    parser.add_argument('-n', '--num-shards', help='The total number of shards to generate', type=int, default=TOTAL_SHARDS)
+    parser.add_argument('-m', '--min-shards', help='The minimum number of shards required to reconstruct the secret', type=int, default=MIN_SHARDS)
     parser.add_argument('-V', '--version', help='Print the version information', action='store_true')
     
     # Parse command line
     args = parser.parse_args()
 
     if args.version:
-        print(prog_description)
-        print("Version: " + str(prog_version) + " (" + str(prog_date) + ")")
+        print(PROG_DESCRIPTION)
+        print("Version: " + str(PROG_VERSION) + " (" + str(PROG_DATE) + ")")
         exit()
 
     # Split the secret into shards
@@ -266,7 +294,7 @@ def main():
         outfiles = split_secret(secret, min_shards, num_shards)
 
         if outfiles:
-            print(f"The following {len(outfiles)} files ahve been generated:")
+            print(f"The following {len(outfiles)} files have been generated:")
             for file in outfiles:
                 print(file)
         else:
