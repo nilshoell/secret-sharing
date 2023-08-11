@@ -1,0 +1,13 @@
+{
+    "id": 1,
+    "shard": 1234567890,
+    "fingerprint": "090d375ec63e4bf29c4",
+    "total_shards": 5,
+    "min_shards": 3,
+    "fingerprints": [
+        "090d375ec63e4bf29c4",
+        "4bf29c45442967008aw",
+        "b515bb6a37935e2ceda",
+        "e2cedac4e96778e98lh"
+    ]
+}
