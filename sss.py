@@ -3,8 +3,8 @@
 # ---------------------------------------------------------------------------
 # ------------------------- Shamir's Secret Sharing -------------------------
 # sss.py
-# Version: 0.1.0
-# 2023-08-10
+# Version: 0.2.0
+# 2023-08-11
 #
 # Authors:
 # Nils Höll
@@ -19,17 +19,21 @@ import base64
 import math
 import random
 import functools
+import os
+import json
+from hashlib import sha256
 
 # ---------------------- CONFIG VARS ----------------------
 
 # Program info
-prog_version = "0.1.0"
-prog_date = "2023-08-10"
+prog_version = "0.2.0"
+prog_date = "2023-08-11"
 prog_description = ""
 
 # Program defaults
 TOTAL_SHARDS = 5
 MIN_SHARDS = 3
+SHARD_PATH = './shards'
 
 # 12th Mersenne Prime
 # (for this application we want a known prime number as close as
@@ -40,6 +44,8 @@ _PRIME = 2 ** 127 - 1
 # The 13th Mersenne Prime is 2**521 - 1
 
 _RINT = functools.partial(random.SystemRandom().randint, 0)
+
+# ------- Core Algorithm Functions -------
 
 def _eval_at(poly, x, prime):
     """Evaluates polynomial (coefficient tuple) at x, used to generate a
@@ -115,15 +121,18 @@ def _lagrange_interpolate(x, x_s, y_s, p):
                for i in range(k)])
     return (_divmod(num, den, p) + p) % p
 
-def recover_secret(shares, prime=_PRIME):
+def recover_secret(shares:list, min:int, prime=_PRIME):
     """
     Recover the secret from share points
     (points (x,y) on the polynomial).
     """
-    if len(shares) < 3:
-        raise ValueError("need at least three shares")
+    if len(shares) < min:
+        raise ValueError(f"need at least {min} shares")
     x_s, y_s = zip(*shares)
     return _lagrange_interpolate(0, x_s, y_s, prime)
+
+
+# ------- Helpers -------
 
 # Converts a string into an integer represtation of its byte array
 def secret_to_int(secret:str):
@@ -137,23 +146,92 @@ def int_to_secret(secret_int:int):
     secret_bin = bin(secret_int)[2:]
     secret_b64 = ""
     for x in range(math.ceil(len(secret_bin) / 7)):
-        char = int(secret_bin[x * 7:(x + 1) * 7], 2)
+        # Special case for b64 padding with '=' at the end
+        if len(secret_bin[x * 7:]) == 12 or len(secret_bin[x * 7:]) <= 6:
+            char = 61
+        else:
+            char = int(secret_bin[x * 7:(x + 1) * 7], 2)
         secret_b64 += chr(char)
     secret = (base64.b64decode(secret_b64)).decode('utf-8')
     return secret
 
+
+# ------- Wrapper Functions -------
+
 def split_secret(secret:str, min:int, max:int):
+    print(f"Splitting secret {secret}")
     secret_int = secret_to_int(secret)
     shards = make_random_shares(secret_int, minimum=min, shares=max)
-    return shards
+
+    # Generate fingerprints
+    fingerprints = []
+    for shard in shards:
+        id, value = shard
+        fingerprint = sha256(f"{id}_{value}".encode()).hexdigest()[1:17]
+        fingerprints.append(fingerprint)
+
+    outfiles = []
+    # Generate full objects and write them to files
+    for shard in shards:
+        id, value = shard
+        fingerprint = sha256(f"{id}_{value}".encode()).hexdigest()[1:17]
+        outfiles.append(f"{id}_{fingerprint}.json")
+        shard_obj = {
+            'id': id,
+            'shard': value,
+            'fingerprint': fingerprint,
+            'total_shards': max,
+            'min_shards': min,
+            'fingerprints': fingerprints
+        }
+
+        # Serializing as json
+        json_object = json.dumps(shard_obj, indent=4)
+ 
+        # Writing to json file
+        with open(f"{SHARD_PATH}/{id}_{fingerprint}.json", "w") as outfile:
+            outfile.write(json_object)
+
+    return outfiles
 
 def join_secrets(shard_files:list):
-    shard_tuples = [(1, 43169837124188720964780342900310458552),
-                    (3, 160134327314659478454450597353340529382),
-                    (5, 91076994147313786513455993446030981984)]
-    secret_int = recover_secret(shard_tuples)
+
+    shard_tuples = []
+
+    # Check if files exist and parse them
+    for file_path in shard_files:
+        if not os.path.isfile(file_path):
+            print(f"ERROR: Shard path '{file_path}' is not a file")
+            return False
+        
+        with open(file_path) as f:
+
+            # get values from file
+            shard_obj = json.load(f)
+            id = shard_obj['id']
+            value = shard_obj['shard']
+            fingerprint = shard_obj['fingerprint']
+            min_shards = shard_obj['min_shards']
+
+            if len(shard_files) < min_shards:
+                print(f"ERROR: Number of supplied shards ({len(shard_files)}) is smaller than number of minimum shards ({min_shards})")
+                return False
+
+            # Check fingerprint
+            fingerprint_new = sha256(f"{id}_{value}".encode()).hexdigest()[1:17]
+            if fingerprint != fingerprint_new:
+                print(f"ERROR: Fingerprint for shard #{id} not matching")
+                return False
+            
+            shard_tuples.append((id, value))
+
+    secret_int = recover_secret(shard_tuples, min_shards)
+    print(secret_int)
     secret = int_to_secret(secret_int)
     return secret
+
+
+# ------- Main & Argparse -------
 
 def main():
     """Main function"""
@@ -164,8 +242,6 @@ def main():
     parser.add_argument('-n', '--num-shards', help='TEXT', type=int, default=TOTAL_SHARDS)
     parser.add_argument('-m', '--min-shards', help='TEXT', type=int, default=MIN_SHARDS)
     parser.add_argument('-S', '--shard-files', help="TEXT", nargs='+')
-    # parser.add_argument('-r', '--reconstruct', help="TEXT", nargs='+')
-    # parser.add_argument('-c', '--shard-counter', help="TEXT", nargs='+')
     parser.add_argument('-V', '--version', help='Print the version information', action='store_true')
     
     # Parse command line
@@ -184,25 +260,33 @@ def main():
             secret = input("Please provide the secret to split:\n")
         else:
             secret = args.secret
-        shards = split_secret(secret, min_shards, num_shards)
-        for shard in shards:
-            print(shard)
+
+        outfiles = split_secret(secret, min_shards, num_shards)
+
+        if outfiles:
+            print(f"The following {len(outfiles)} files ahve been generated:")
+            for file in outfiles:
+                print(file)
+        else:
+            print("ERROR: Could not generate shards/outfiles")
+        
         return
 
     # Join the shards back into a secret
     if args.join:
-        if type(args.shard_files) != list or len(args.shard_files) == 0:
-            pass
+        if type(args.shard_files) != list or len(args.shard_files) <= 1:
+            print("ERROR: Please provide the path to at least two shard files")
+            exit(1)
 
         shard_files = args.shard_files
-
-        for file in shard_files:
-            # Check if it is a file
-            # Parse JSON
-            pass
         
         result = join_secrets(shard_files)
-        print(result)
+        if result:
+            print(f"The recovered secret is: {result}")
+        else:
+            print("ERROR: Reconstruction of secret not successful")
+            exit(1)
+        
         return
 
 if __name__ == '__main__':
