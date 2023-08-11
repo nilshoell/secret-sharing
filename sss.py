@@ -29,7 +29,8 @@ from hashlib import sha256
 PROG_VERSION = "0.2.1"
 PROG_DATE = "2023-08-11"
 PROG_DESCRIPTION = """This tool is able to split a secret (e.g., a passphrase or key) into a user-defined number of shards based on Shamir's Secret Sharing algorithm.
-To reconstruct the initial secret, only a subset of these shards is required (can also be specified)."""
+To reconstruct the initial secret, only a subset of these shards is required (can also be specified).
+NOTE: There is currently a length limitation for the secret, depending on its complexity, at around 12 chars."""
 
 # Program defaults
 TOTAL_SHARDS = 5
@@ -92,14 +93,13 @@ def _extended_gcd(a, b):
 
 def _divmod(num, den, p):
     """Compute num / den modulo prime p
-
     To explain this, the result will be such that: 
     den * _divmod(num, den, p) % p == num
     """
     inv, _ = _extended_gcd(den, p)
     return num * inv
 
-def _lagrange_interpolate(x, x_s, y_s, p):
+def _lagrange_interpolate(x:int, x_s:tuple, y_s:tuple, p):
     """
     Find the y-value for the given x, given n (x, y) points;
     k points will define a polynomial of up to kth order.
