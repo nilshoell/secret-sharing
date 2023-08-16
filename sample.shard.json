@@ -2,7 +2,7 @@
     "id": 1,
     "shard": 1234567890,
     "fingerprint": "090d375ec63e4bf29c4",
-    "total_shards": 5,
+    "total_shards": 4,
     "min_shards": 3,
     "fingerprints": [
         "090d375ec63e4bf29c4",
