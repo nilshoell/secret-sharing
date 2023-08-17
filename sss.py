@@ -22,6 +22,7 @@ import functools
 import os
 import json
 from hashlib import sha256
+import string
 
 # ---------------------- CONFIG VARS ----------------------
 
@@ -37,6 +38,7 @@ TOTAL_SHARDS = 5
 MIN_SHARDS = 3
 SHARD_PATH = './shards'
 DEBUG = False
+ASCII_MODE = True
 
 # 12th Mersenne Prime
 # (for this application we want a known prime number as close as
@@ -139,44 +141,77 @@ def recover_secret(shares:list, min:int, prime=_PRIME):
 # Converts a string into an integer represtation of its byte array
 def secret_to_int(secret:str):
 
-    # Convert to Base64 for predictable characters
-    secret_b64 = base64.b64encode(secret.encode('utf-8'))
+    if ASCII_MODE:
+        ASCII_CHARS = string.ascii_letters + string.digits + string.punctuation
 
-    # Convert into bitstring, with each character taking 7 bits
-    secret_bin = ''.join(item[2:].zfill(7) for item in map(bin, secret_b64))
+        if all(char in ASCII_CHARS for char in secret):
+            secret_int = ''
+            for char in secret:
+                if ord(char) >= 100:
+                    secret_int += str(ord(char) - 100).zfill(2)
+                else:
+                    secret_int += str(ord(char))
 
-    # Convert to integer for SSS processing
-    secret_int = int(secret_bin, 2)
+            if DEBUG:
+                print(f"[SPLIT]: Secret: {secret}")
+                print(f"[SPLIT]: Secret int: {secret_int}")
 
-    if DEBUG:
-        print(f"[SPLIT]: Secret: {secret}")
-        print(f"[SPLIT]: Secret b64: {secret_b64}")
-        print(f"[SPLIT]: Secret bin: {secret_bin}")
-        print(f"[SPLIT]: Secret int: {secret_int}")
+            secret_int = int(secret_int)
 
+        else:
+            print(f"ERROR: ASCII mode is active, please exclusively use the following characters: {ASCII_CHARS}")
+
+    else:
+        # Convert to Base64 for predictable characters
+        secret_b64 = base64.b64encode(secret.encode('utf-8'))
+
+        # Convert into bitstring, with each character taking 7 bits
+        secret_bin = ''.join(item[2:].zfill(7) for item in map(bin, secret_b64))
+
+        # Convert to integer for SSS processing
+        secret_int = int(secret_bin, 2)
+
+        if DEBUG:
+            print(f"[SPLIT]: Secret: {secret}")
+            print(f"[SPLIT]: Secret b64: {secret_b64}")
+            print(f"[SPLIT]: Secret bin: {secret_bin}")
+            print(f"[SPLIT]: Secret int: {secret_int}")
+
+    
     return secret_int
 
 
 # Converts an integer back into a string
 def int_to_secret(secret_int:int):
-    secret_bin = bin(secret_int)[2:]
-    secret_b64 = ""
 
-    # Convert the bitstring back to Base 64
-    for x in range(math.ceil(len(secret_bin) / 7)):
-        char = int(secret_bin[x * 7:(x + 1) * 7], 2)
-        secret_b64 += chr(char)
-    
-    if DEBUG:
-        print(f"[JOIN]: Secret int: {secret_int}")
-        print(f"[JOIN]: Secret bin: {secret_bin}")
-        print(f"[JOIN]: Secret b64: {secret_b64}")
-    
-    # Decode the Base64 to the original secret
-    secret = (base64.b64decode(secret_b64)).decode('utf-8')
+    secret = ""
 
-    if DEBUG:
-        print(f"[JOIN]: Secret: {secret}")
+    if ASCII_MODE:
+        for x in range(int(len(str(secret_int))/2)):
+            char_int = int(str(secret_int)[x*2:(x+1)*2])
+            if char_int < 30:
+                char_int += 100
+            secret += chr(char_int)
+
+    else:
+        secret_bin = bin(secret_int)[2:]
+        secret_b64 = ""
+
+        # Convert the bitstring back to Base 64
+        for x in range(math.ceil(len(secret_bin) / 7)):
+            char = int(secret_bin[x * 7:(x + 1) * 7], 2)
+            secret_b64 += chr(char)
+
+        if DEBUG:
+            print(f"[JOIN]: Secret int: {secret_int}")
+            print(f"[JOIN]: Secret bin: {secret_bin}")
+            print(f"[JOIN]: Secret b64: {secret_b64}")
+
+        # Decode the Base64 to the original secret
+        secret = (base64.b64decode(secret_b64)).decode('utf-8')
+
+        if DEBUG:
+            print(f"[JOIN]: Secret: {secret}")
     
     return secret
 
