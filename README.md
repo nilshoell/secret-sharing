@@ -15,7 +15,7 @@ This is an expirmental implementation of [Shamir's Secret Sharing](https://en.wi
 
 ## Introduction
 
-If you want to learn more about Shamir's Secret Sharing algorithm, I recommend to start with the Wikipedia article linked above.  
+If you want to learn more about Shamir's Secret Sharing algorithm, I recommend to start with the Wikipedia article linked above or the explanations from [B. Poettering](http://point-at-infinity.org/ssss/)s implementation.  
 In short, the algorithm can be used to split a secret (e.g. a passphrase or other secret key) into multiple (`n`) _shards_ or _shares_. These can then be distributed to multiple people or entities, and the algorithm guaratees (if implemented correctly) that no single shard can be used to retrieve any information about the original secret.  
 A minimum number of shards required (`m`) can be defined, and any combination of shards (at least `m` out of `n`) can be used to reconstruct the original secret.
 
@@ -61,7 +61,8 @@ Based on the metadata in the JSON files, the program checks if enough files are 
 
 ## Limitations
 
-As stated above, **this is not a security tool**. The critical code is based on an example from Wikipedia, and has not been audited, so please **do not use this for anything where security is important**.
+As stated above, **this is not a security tool**. The critical code is based on an example from Wikipedia, and has not been audited, so please **do not use this for anything where security is important**.  
+There are other implementations by [Ryan Shea](https://github.com/shea256/secret-sharing) (Python) and [B. Poettering](http://point-at-infinity.org/ssss/) (C, also available as Debian package `ssss`).
 
 Furthermore, the length of the secret is heavily limited by the underlying implementation, I'll try to fix that in the future. In ASCII mode, the **limit seems to be at 19 characters**, in non-ASCII mode, depending on the complexity (i.e. use of special characters) of the secret, the **limit is at around 12** characters.  
 The program will test recombination at runtime of the initial split to check whether it will work.
