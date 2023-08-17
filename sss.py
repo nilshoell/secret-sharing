@@ -160,6 +160,7 @@ def secret_to_int(secret:str):
 
         else:
             print(f"ERROR: ASCII mode is active, please exclusively use the following characters: {ASCII_CHARS}")
+            exit(1)
 
     else:
         # Convert to Base64 for predictable characters
@@ -223,6 +224,11 @@ def split_secret(secret:str, min:int, max:int):
     print(f"Splitting secret {secret}")
     secret_int = secret_to_int(secret)
     shards = make_random_shares(secret_int, minimum=min, shares=max)
+
+    # Immediately test the recombination to see if the input wasn't too large
+    if recover_secret(shards, min) != secret_int:
+        print(f"ERROR: Could not recombine the created shards, input is likely too long")
+        exit(1)
 
     # Generate fingerprints
     fingerprints = []
