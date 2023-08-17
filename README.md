@@ -6,6 +6,7 @@
     - [Split a Secret](#split-a-secret)
     - [Reconstruct a Secret](#reconstruct-a-secret)
   - [Limitations](#limitations)
+  - [Config](#config)
 
 
 This is an expirmental implementation of [Shamir's Secret Sharing](https://en.wikipedia.org/wiki/Shamir%27s_secret_sharing) algorithm based on the code samples in the linked Wikipedia article.
@@ -62,5 +63,18 @@ Based on the metadata in the JSON files, the program checks if enough files are 
 
 As stated above, **this is not a security tool**. The critical code is based on an example from Wikipedia, and has not been audited, so please **do not use this for anything where security is important**.
 
-Furthermore, the length of the secret is heavily limited by the underlying implementation, I'll try to fix that in the future. Depending on the complexity (i.e. use of special characters) of the secret, the **limit is at around 12** characters.  
-I recommend testing the reconstruction after splitting to see if it worked.
+Furthermore, the length of the secret is heavily limited by the underlying implementation, I'll try to fix that in the future. In ASCII mode, the **limit seems to be at 19 characters**, in non-ASCII mode, depending on the complexity (i.e. use of special characters) of the secret, the **limit is at around 12** characters.  
+The program will test recombination at runtime of the initial split to check whether it will work.
+
+## Config
+
+This is an overview of some additional config vars that can be set in the script:
+
+| Variable     | Values (Default)           | Description                                                  |
+| ------------ | -------------------------- | ------------------------------------------------------------ |
+| TOTAL_SHARDS | INT (`5`)                  | Default number of shards generated                           |
+| MIN_SHARDS   | INT (`3`)                  | Default minimum number of shards required for reconstruction |
+| SHARD_PATH   | STR (`'./shards'`)         | Folder where shard files are stored                          |
+| DEBUG        | `True\|False` (`False`)    | Enables additional debug output                              |
+| ASCII_MODE   | `True\|False` (`True`)     | Toggles the ASCII mode                                       |
+| _PRIME       | Any Prime (`2 ** 127 - 1`) | Base prime (12th Mersenne Prime)                             |
